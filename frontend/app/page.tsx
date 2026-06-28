@@ -10,6 +10,8 @@ import {
   type RhEvent,
 } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
+import ModelProbe from "./components/ModelProbe";
+import AvatarScene from "./components/AvatarScene";
 
 type Phase = "idle" | "running" | "done" | "error";
 type NodeStatus = "running" | "succeeded" | "failed";
@@ -24,6 +26,7 @@ interface NodeState {
 
 const PIPELINES = [
   { value: "pipelines/round1.yaml", label: "round1 · 首轮" },
+  { value: "pipelines/api_smoke.yaml", label: "api_smoke · API路线" },
   { value: "pipelines/continue.yaml", label: "continue · 再来一轮" },
 ];
 
@@ -99,7 +102,6 @@ export default function Page() {
   }, [question, pipeline, phase, applyEvent]);
 
   const againRound = useCallback(() => {
-    // C8: carry the prior round's final synthesis as the seed for continue.yaml.
     const lastKey = [...order].reverse().find((k) => nodes[k]?.status === "succeeded");
     const seed = lastKey ? nodes[lastKey]?.content ?? "" : "";
     setQuestion(seed);
@@ -135,22 +137,30 @@ export default function Page() {
       ? "已完成"
       : "已中断";
 
+  // 获取当前正在运行节点的 Provider 和 Step 名字
+  const currentRunningKey = order.find((k) => nodes[k]?.status === "running");
+  const currentProvider = currentRunningKey ? nodes[currentRunningKey]?.provider : undefined;
+
   return (
     <main className="wrap">
       <header className="masthead">
-        <span className="brand">RHCLOUD</span>
-        <h1>接力控制台</h1>
+        <span className="brand">RHCLOUD V1</span>
+        <h1>AI 智能接力协作控制台</h1>
         <span className="sub">multi-model relay {USE_MOCK ? "· MOCK" : ""}</span>
       </header>
 
+      {/* 1. 大模型探针仪表盘 */}
+      <ModelProbe />
+
+      {/* 2. 交互控制面板 */}
       <section className="panel">
         <label className="field" htmlFor="q">
-          问题
+          输入您的任务或提问 (Prompt)
         </label>
         <textarea
           id="q"
           rows={4}
-          placeholder="例如：帮我设计一个高并发短链服务"
+          placeholder="例如：帮我设计一个高并发短链服务架构，包含缓存与数据库设计"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           disabled={running}
@@ -158,7 +168,7 @@ export default function Page() {
         <div className="controls">
           <div className="grow">
             <label className="field" htmlFor="pl">
-              流水线
+              选择执行流水线
             </label>
             <select id="pl" value={pipeline} onChange={(e) => setPipeline(e.target.value)} disabled={running}>
               {PIPELINES.map((p) => (
@@ -169,11 +179,17 @@ export default function Page() {
             </select>
           </div>
           <button onClick={run} disabled={running || !question.trim()}>
-            {running ? "执行中…" : "开始执行"}
+            {running ? "智能协同中…" : "🚀 开始接力执行"}
           </button>
         </div>
       </section>
 
+      {/* 3. 动态小人沟通互动场景 (仅在运行中或有节点执行时展示) */}
+      {(running || phase !== "idle") && (
+        <AvatarScene activeProvider={currentProvider} stepKey={currentRunningKey} />
+      )}
+
+      {/* 4. 任务执行时间轴与节点卡片 */}
       {phase !== "idle" && (
         <>
           <div className="statusline">
@@ -211,12 +227,13 @@ export default function Page() {
         </>
       )}
 
-      {banner && <div className="banner">{banner}</div>}
+      {banner && <div className="banner" style={{ marginTop: "20px", color: "var(--danger)" }}>{banner}</div>}
 
+      {/* 5. 导出结果面板 */}
       {finished && jobId && (
-        <section className="result">
-          <h2>结果</h2>
-          <div className="exports">
+        <section className="panel" style={{ marginTop: "28px" }}>
+          <h3 style={{ margin: "0 0 16px 0", color: "var(--accent)" }}>📥 任务导出与续写</h3>
+          <div className="controls" style={{ marginTop: 0 }}>
             <button className="ghost" onClick={() => onExport("merged")} disabled={USE_MOCK}>
               导出合并 Markdown
             </button>
@@ -226,9 +243,9 @@ export default function Page() {
             <button className="ghost" onClick={() => onExport("json")} disabled={USE_MOCK}>
               导出 JSON
             </button>
-            <button onClick={againRound}>再来一轮</button>
+            <button onClick={againRound}>再来一轮接力</button>
           </div>
-          {USE_MOCK && <p className="note">Mock 模式下没有落盘文件，导出按钮已禁用。连接真实后端后可用。</p>}
+          {USE_MOCK && <p style={{ fontSize: "12px", color: "var(--muted)", marginTop: "12px" }}>Mock 模式下没有落盘文件，导出按钮已禁用。连接真实后端后可用。</p>}
         </section>
       )}
     </main>
