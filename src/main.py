@@ -274,7 +274,30 @@ def create_app(
         user_question = body.get("user_question")
         if not isinstance(user_question, str) or not user_question.strip():
             raise HTTPException(status_code=400, detail="missing 'user_question'")
-        pipeline = body.get("pipeline", "pipelines/round1.yaml")
+        
+        selected = body.get("selected_providers")
+        job_id = str(uuid.uuid4())
+        session_dir = os.path.join(sessions_root, job_id)
+        os.makedirs(session_dir, exist_ok=True)
+
+        if isinstance(selected, list) and len(selected) > 0:
+            import yaml
+            dyn_path = os.path.join(session_dir, "pipeline.yaml")
+            dyn_cfg = {
+                "name": "Custom Selected Relay",
+                "steps": [
+                    {"key": "generate", "providers": selected, "prompt": "generate"},
+                    {"key": "review", "provider": selected[0], "prompt": "review"},
+                    {"key": "deep_analyze", "provider": selected[1] if len(selected) > 1 else selected[0], "prompt": "deep_analyze"},
+                    {"key": "improve", "providers": selected, "prompt": "improve"},
+                    {"key": "summary", "provider": selected[0], "prompt": "summary"},
+                ]
+            }
+            with open(dyn_path, "w", encoding="utf-8") as f:
+                yaml.safe_dump(dyn_cfg, f)
+            pipeline = dyn_path
+        else:
+            pipeline = body.get("pipeline", "pipelines/round1.yaml")
 
         # A5 defense: validate the pipeline at submit; 400 on any failure.
         try:
@@ -287,12 +310,11 @@ def create_app(
                 raise HTTPException(status_code=429, detail="max concurrent jobs reached")
             active["n"] += 1
             metrics.set_gauge(M_ACTIVE_JOBS, active["n"])
-            job_id = str(uuid.uuid4())
             jobs[job_id] = {
                 "status": "running",
                 "cancelled": False,
                 "events": [],
-                "session_dir": os.path.join(sessions_root, job_id),
+                "session_dir": session_dir,
             }
 
         metrics.inc(M_JOBS_TOTAL)

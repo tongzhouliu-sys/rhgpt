@@ -33,6 +33,17 @@ const PIPELINES = [
   { value: "pipelines/continue.yaml", label: "continue · 深入再来一轮" },
 ];
 
+const AVAILABLE_MODELS = [
+  { id: "openai_api_1", label: "OpenAI 直连/中转 API", provider: "openai_api", api: true },
+  { id: "gemini_api_1", label: "Gemini 官方 API", provider: "gemini_api", api: true },
+  { id: "anthropic_api_1", label: "Anthropic 直连 API", provider: "anthropic_api", api: true },
+  { id: "qwen_api_1", label: "通义千问 Qwen API", provider: "qwen_api", api: true },
+  { id: "chatgpt_web_1", label: "ChatGPT Web 网页", provider: "chatgpt", api: false },
+  { id: "claude_web_1", label: "Claude Web 网页", provider: "claude", api: false },
+  { id: "kimi_web_1", label: "Kimi Web 网页", provider: "kimi", api: false },
+  { id: "deepseek_web_1", label: "DeepSeek Web 网页", provider: "deepseek", api: false },
+];
+
 const BADGE: Record<NodeStatus, string> = {
   running: "运行中",
   succeeded: "完成",
@@ -48,7 +59,37 @@ export default function Page() {
   const [nodes, setNodes] = useState<Record<string, NodeState>>({});
   const [jobId, setJobId] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
+  const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
+  const [selectedModels, setSelectedModels] = useState<string[]>([
+    "openai_api_1",
+    "gemini_api_1",
+    "anthropic_api_1",
+    "chatgpt_web_1",
+    "kimi_web_1",
+  ]);
   const abortRef = useRef<AbortController | null>(null);
+
+  const toggleModel = (id: string) => {
+    setSelectedModels((prev) =>
+      prev.includes(id) ? (prev.length > 1 ? prev.filter((m) => m !== id) : prev) : [...prev, id]
+    );
+  };
+
+  const selectOnlyAPI = () => {
+    setSelectedModels(["openai_api_1", "gemini_api_1", "anthropic_api_1", "qwen_api_1"]);
+  };
+
+  const selectAllModels = () => {
+    setSelectedModels(AVAILABLE_MODELS.map((m) => m.id));
+  };
+
+  const toggleExpand = useCallback((key: string) => {
+    setExpandedKeys((prev) => {
+      const isLast = order.length > 0 && order[order.length - 1] === key;
+      const current = prev[key] !== undefined ? prev[key] : isLast;
+      return { ...prev, [key]: !current };
+    });
+  }, [order]);
 
   // Sync theme with html data attribute & localStorage
   useEffect(() => {
@@ -111,11 +152,12 @@ export default function Page() {
     setBanner(null);
     setOrder([]);
     setNodes({});
+    setExpandedKeys({});
     setJobId(null);
     setPhase("running");
 
     try {
-      const id = await createJob(q, pipeline);
+      const id = await createJob(q, pipeline, selectedModels);
       setJobId(id);
       await streamEvents(id, applyEvent, ac.signal);
       setPhase((p) => (p === "running" ? "done" : p));
@@ -214,6 +256,55 @@ export default function Page() {
           onChange={(e) => setQuestion(e.target.value)}
           disabled={running}
         />
+        <div className="model-select-wrapper">
+          <div className="model-select-header">
+            <label className="field" style={{ margin: 0 }}>
+              🤖 选择参与接力互动的大模型 (可多选，直连 API 优先)
+            </label>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                type="button"
+                className="ghost"
+                style={{ padding: "5px 12px", fontSize: "12px" }}
+                onClick={selectOnlyAPI}
+                disabled={running}
+              >
+                ⚡ 仅选直连 API
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                style={{ padding: "5px 12px", fontSize: "12px" }}
+                onClick={selectAllModels}
+                disabled={running}
+              >
+                🌐 全选所有模型
+              </button>
+            </div>
+          </div>
+          <div className="model-select-grid">
+            {AVAILABLE_MODELS.map((m) => {
+              const checked = selectedModels.includes(m.id);
+              return (
+                <label
+                  key={m.id}
+                  className={`model-pill ${checked ? (m.api ? "active active-api" : "active") : ""}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleModel(m.id)}
+                    disabled={running}
+                  />
+                  <AgentLogo provider={m.provider} size={16} />
+                  <span>{m.label}</span>
+                  <span className={`model-badge-tag ${m.api ? "api" : "web"}`}>{m.api ? "API" : "Web"}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="controls">
           <div className="grow">
             <label className="field" htmlFor="pl">
@@ -252,13 +343,19 @@ export default function Page() {
           </div>
 
           <div className="relay">
-            {order.map((key) => {
+            {order.map((key, idx) => {
               const n = nodes[key];
-              const open = n.status === "succeeded" || n.status === "failed";
+              const isLast = idx === order.length - 1;
+              const open = expandedKeys[key] !== undefined ? expandedKeys[key] : isLast;
               return (
                 <div key={key} className={`node ${n.status}`}>
                   <div className={`card ${n.status} ${open ? "open" : ""}`}>
-                    <div className="head">
+                    <div
+                      className="head"
+                      onClick={() => toggleExpand(key)}
+                      style={{ cursor: "pointer", userSelect: "none" }}
+                      title="点击展开/折叠该模型回答"
+                    >
                       <span className="key">{key}</span>
                       {n.provider && (
                         <div className="provider-tag">
@@ -267,13 +364,16 @@ export default function Page() {
                         </div>
                       )}
                       <span className="badge">{BADGE[n.status]}</span>
+                      <span style={{ fontSize: "12px", color: "var(--muted)", marginLeft: "8px", fontFamily: "var(--mono)" }}>
+                        {open ? "▲ 折叠" : "▼ 展开答案"}
+                      </span>
                     </div>
-                    {(n.status === "succeeded" || (n.status === "running" && n.content)) && (
+                    {open && (n.status === "succeeded" || (n.status === "running" && n.content)) && (
                       <div className="body">
                         <div className="md" dangerouslySetInnerHTML={{ __html: renderMarkdown(n.content || "") }} />
                       </div>
                     )}
-                    {n.status === "failed" && (
+                    {open && n.status === "failed" && (
                       <div className="errbox">
                         {n.error ? `${n.error.type}: ${n.error.message}` : "步骤失败"}
                       </div>

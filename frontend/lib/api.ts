@@ -77,10 +77,14 @@ async function signedHeaders(
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ---- endpoints --------------------------------------------------------------
-export async function createJob(userQuestion: string, pipeline: string): Promise<string> {
+export async function createJob(userQuestion: string, pipeline: string, selectedProviders?: string[]): Promise<string> {
   if (USE_MOCK) return mockCreateJob(userQuestion, pipeline);
   const path = "/jobs";
-  const body = new TextEncoder().encode(JSON.stringify({ user_question: userQuestion, pipeline }));
+  const payload: any = { user_question: userQuestion, pipeline };
+  if (selectedProviders && selectedProviders.length > 0) {
+    payload.selected_providers = selectedProviders;
+  }
+  const body = new TextEncoder().encode(JSON.stringify(payload));
   const headers = { ...(await signedHeaders("POST", path, body)), "Content-Type": "application/json" };
   const res = await fetch(API_BASE + path, { method: "POST", headers, body });
   if (!res.ok) throw new Error(`Create run failed (${res.status}): ${await res.text()}`);
