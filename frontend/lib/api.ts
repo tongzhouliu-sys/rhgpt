@@ -35,7 +35,7 @@ export const USE_MOCK = (process.env.NEXT_PUBLIC_USE_MOCK ?? "") === "1";
 const MAX_SSE_ATTEMPTS = 5;
 
 // ---- HMAC signing (mirrors src/auth.py canonical exactly) -------------------
-function toHex(buf: ArrayBuffer): string {
+function toHex(buf: any): string {
   return Array.from(new Uint8Array(buf))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
@@ -48,12 +48,12 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 async function hmacHex(secret: string, message: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(secret),
+    new TextEncoder().encode(secret) as any,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]
   );
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message) as any);
   return toHex(sig);
 }
 
