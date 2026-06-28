@@ -227,10 +227,18 @@ npm run build                                # 静态导出到 ./out，部署 Cl
 
 ## 部署
 
+完整步骤见 **`docs/deploy.md`**（GitHub → Railway → Cloudflare Pages），含环境变量清单、
+冒烟脚本与运维。要点：仓库已带 `railway.toml`（Dockerfile 构建 + `/health` 健康检查）、
+`Dockerfile`（已监听 `${PORT}`，Xvfb 有头 Chromium）、`.env.example`（后端变量）、
+`pipelines/api_smoke.yaml`（无浏览器单步冒烟）。
+
 ```bash
 docker build -t rhcloud .
-# 容器内通过 xvfb-run 启动 uvicorn src.main:app（网关已交付，见上）
+# 容器内经 xvfb-run 启动 uvicorn src.main:app（监听 ${PORT:-8000}）
 ```
+
+> **单实例**：Job 注册表与 SSE 事件表在内存，不要加副本。Volume 挂 `/app/data`
+> （覆盖 `data/sessions` 与 `data/profiles`）。
 
 会话清理（保留期可经环境变量 `SESSION_RETENTION_DAYS` 覆盖，默认 14；`--days` 优先级高于环境变量）：
 

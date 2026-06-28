@@ -1,0 +1,8 @@
+# API-only smoke (1 step, no browser / no seeding). Use this to verify a fresh
+# Railway deploy end-to-end before web Providers are seeded/calibrated.
+# Needs only GEMINI_API_KEY (or GOOGLE_API_KEY) set on the backend.
+name: "API smoke"
+steps:
+  - key: generate
+    provider: gemini_api_1
+    prompt: generate
