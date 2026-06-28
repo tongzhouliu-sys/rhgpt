@@ -1,0 +1,5 @@
+name: "fixture flaky"
+steps:
+  - key: s1
+    provider: flaky_1
+    prompt: p1

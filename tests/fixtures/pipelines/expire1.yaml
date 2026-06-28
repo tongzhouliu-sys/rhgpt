@@ -1,0 +1,5 @@
+name: "fixture expire"
+steps:
+  - key: s1
+    provider: expire_1
+    prompt: p1

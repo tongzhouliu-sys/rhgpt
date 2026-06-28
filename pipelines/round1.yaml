@@ -1,0 +1,21 @@
+# Round 1 — full 5-step relay (B7). Mixes web + official-API providers so V1's
+# "≥3 models incl ≥1 API" acceptance is met (chatgpt + claude web, gemini API).
+# Every step's prompt references {{user_question}} + its immediate predecessor,
+# so the forward-reference check passes.
+name: "QA Refinement Round 1"
+steps:
+  - key: generate
+    provider: chatgpt_web_1
+    prompt: generate
+  - key: review
+    provider: gemini_api_1
+    prompt: review
+  - key: deep_analyze
+    provider: claude_web_1
+    prompt: deep_analyze
+  - key: improve
+    provider: chatgpt_web_1
+    prompt: improve
+  - key: summary
+    provider: gemini_api_1
+    prompt: summary

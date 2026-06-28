@@ -1,0 +1,5 @@
+name: "fixture missing provider"
+steps:
+  - key: s1
+    provider: does_not_exist
+    prompt: p1

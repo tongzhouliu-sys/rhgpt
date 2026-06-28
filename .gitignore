@@ -1,0 +1,30 @@
+# --- Secrets / runtime data (§9.3 — MUST be ignored) ---
+data/profiles/
+data/sessions/
+.env
+*.env
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Node / frontend (C) ---
+node_modules/
+frontend/.next/
+frontend/out/
+
+# --- OS / editor ---
+.DS_Store
+.idea/
+.vscode/

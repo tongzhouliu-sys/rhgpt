@@ -1,0 +1,5 @@
+name: "fixture missing prompt"
+steps:
+  - key: s1
+    provider: ok_1
+    prompt: no_such_prompt

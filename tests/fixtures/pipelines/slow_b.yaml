@@ -1,0 +1,5 @@
+name: "fixture slow B"
+steps:
+  - key: s1
+    provider: slow_1
+    prompt: p1

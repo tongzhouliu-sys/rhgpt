@@ -1,0 +1,51 @@
+# RHCLOUD V1 — Provider instance config (§6.1.1).
+# A owns the SCHEMA and its validation (src/validation.py). Account/profile
+# values and API keys are filled on the deploy side (ops/B); secrets never live
+# here (§9.3). Adding an account = a few lines below; adding a website = a new
+# src/providers/{site}.py. Manager/Runtime/Builder do not change.
+#
+# Route decisions (17.1): gemini & qwen -> official API; chatgpt/claude/
+# deepseek/zai/kimi -> web automation. Grok is excluded for V1.
+
+defaults:
+  timeout_ms: 120000        # single-step generation wait ceiling
+  retries: 2                # transient-error retries (exponential backoff)
+  retry_backoff_ms: 3000    # backoff base (ms), grows as base * 2**(attempt-1)
+
+providers:
+  # --- Web-automation Providers (B implements src/providers/{site}.py) -------
+  chatgpt_web_1:
+    site: chatgpt
+    profile: data/profiles/chatgpt_acc1
+    # timeout_ms: 180000    # optional per-instance override
+
+  claude_web_1:
+    site: claude
+    profile: data/profiles/claude_acc1
+
+  deepseek_web_1:
+    site: deepseek
+    profile: data/profiles/deepseek_acc1
+
+  zai_web_1:
+    site: zai
+    profile: data/profiles/zai_acc1
+
+  kimi_web_1:
+    site: kimi
+    profile: data/profiles/kimi_acc1
+
+  # --- Official-API Providers (profile empty; API key via env, §9.3) ---------
+  gemini_api_1:
+    site: gemini_api
+    profile: ""
+
+  qwen_api_1:
+    site: qwen_api
+    profile: ""
+
+  # --- M1 stub (A-owned src/providers/stub.py): runs the kernel with no model.
+  # Keep for smoke tests; safe to leave in place.
+  stub_1:
+    site: stub
+    profile: ""

@@ -1,0 +1,19 @@
+# Continue — "再来一轮" (B7 / C8). SKIPS generate: the prior round's result is
+# seeded as user_question by the frontend, so the first step (keyed `review`)
+# uses the `recap` prompt, which faithfully restates that seed. Downstream steps
+# reuse the same refinement prompts; all references resolve (review precedes
+# deep_analyze, etc.), so the pipeline validates.
+name: "QA Refinement Continue"
+steps:
+  - key: review
+    provider: gemini_api_1
+    prompt: recap
+  - key: deep_analyze
+    provider: claude_web_1
+    prompt: deep_analyze
+  - key: improve
+    provider: chatgpt_web_1
+    prompt: improve
+  - key: summary
+    provider: gemini_api_1
+    prompt: summary

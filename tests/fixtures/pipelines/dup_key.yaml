@@ -1,0 +1,8 @@
+name: "fixture duplicate key"
+steps:
+  - key: s1
+    provider: ok_1
+    prompt: p1
+  - key: s1
+    provider: ok_2
+    prompt: p1

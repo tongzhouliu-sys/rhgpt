@@ -1,0 +1,8 @@
+name: "fixture ok 2-step"
+steps:
+  - key: s1
+    provider: ok_1
+    prompt: p1
+  - key: s2
+    provider: ok_2
+    prompt: p2

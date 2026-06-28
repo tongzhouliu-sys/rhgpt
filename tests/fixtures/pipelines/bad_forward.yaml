@@ -1,0 +1,8 @@
+name: "fixture forward-ref bug"
+steps:
+  - key: s1
+    provider: ok_1
+    prompt: pbad_forward
+  - key: s2
+    provider: ok_1
+    prompt: p1

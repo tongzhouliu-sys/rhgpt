@@ -1,0 +1,5 @@
+name: "fixture unknown var"
+steps:
+  - key: s1
+    provider: ok_1
+    prompt: punknown

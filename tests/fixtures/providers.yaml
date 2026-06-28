@@ -1,0 +1,22 @@
+# Fixture providers.yaml for A's tests. provider_package is overridden to
+# tests.fixtures.providers, so 'site' maps to those stub modules.
+defaults:
+  timeout_ms: 5000
+  retries: 2
+  retry_backoff_ms: 1      # tiny backoff so retry tests run fast
+providers:
+  ok_1:
+    site: ok
+    profile: p_ok
+  ok_2:
+    site: ok
+    profile: p_ok2
+  expire_1:
+    site: expire
+    profile: p_expire
+  flaky_1:
+    site: flaky
+    profile: "flaky:1"
+  slow_1:
+    site: slow
+    profile: p_slow

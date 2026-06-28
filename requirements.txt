@@ -1,0 +1,8 @@
+# RHCLOUD V1 runtime dependencies (§12.3). A owns this file; B/C request
+# additions (e.g. B: playwright-stealth) and A merges them.
+fastapi
+uvicorn
+pyyaml
+playwright
+playwright-stealth
+requests
