@@ -89,6 +89,8 @@ def _run_step_with_retry(
     key: str,
     *,
     job_id: Optional[str] = None,
+    on_chunk: Optional[Callable[[str], None]] = None,
+    is_cancelled: Optional[Callable[[], bool]] = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> dict:
     """Run one step. Classify failures:
@@ -101,11 +103,13 @@ def _run_step_with_retry(
     started = _now_iso()
     site = conf.get("site")
     while True:
+        if is_cancelled and is_cancelled():
+            return _fail("cancelled", "job was cancelled by user", attempt, started)
         attempt += 1
         try:
             lock = _lock_for(conf["profile"])  # [修正-8] serialize per profile
             with lock:
-                content = manager.run(provider_name, prompt)
+                content = manager.run(provider_name, prompt, on_chunk=on_chunk)
             if content is None or content == "":
                 # Contract: providers must return non-empty text. Treat empty as
                 # transient so it benefits from retry rather than silently passing.
@@ -173,6 +177,7 @@ def run_pipeline(
     manager: Optional[ProviderManager] = None,
     validate: bool = True,
     job_id: Optional[str] = None,
+    is_cancelled: Optional[Callable[[], bool]] = None,
 ) -> dict:
     """Execute a pipeline sequentially.
 
@@ -208,6 +213,9 @@ def run_pipeline(
     log_event(_log, "pipeline_started", job_id=job_id)
 
     for index, step in enumerate(config["steps"]):
+        if is_cancelled and is_cancelled():
+            push({"type": "fatal", "error": {"type": "cancelled", "message": "job was cancelled by user"}})
+            break
         key = step["key"]
         provider_name = step["provider"]
         prompt_name = step["prompt"]
@@ -227,8 +235,18 @@ def run_pipeline(
         )
         push({"type": "step_started", "key": key, "provider": provider_name})
 
+        def handle_chunk(delta: str) -> None:
+            push({"type": "step_chunk", "key": key, "provider": provider_name, "delta": delta})
+
         result = _run_step_with_retry(
-            manager, provider_name, prompt_text, conf, key, job_id=job_id
+            manager,
+            provider_name,
+            prompt_text,
+            conf,
+            key,
+            job_id=job_id,
+            on_chunk=handle_chunk,
+            is_cancelled=is_cancelled,
         )
 
         duration_ms = _ms_between(result["started_at"], result["finished_at"])

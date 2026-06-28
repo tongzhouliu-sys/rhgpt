@@ -6,6 +6,7 @@ import { mockCreateJob, mockGetJob, mockStreamEvents } from "./mock";
 
 export type EventType =
   | "step_started"
+  | "step_chunk"
   | "step_succeeded"
   | "step_failed"
   | "pipeline_finished"
@@ -17,6 +18,7 @@ export interface RhEvent {
   key?: string;
   provider?: string;
   content?: string;
+  delta?: string;
   error?: { type: string; message: string };
 }
 
@@ -92,6 +94,14 @@ export async function getJob(jobId: string): Promise<JobState> {
   const res = await fetch(API_BASE + path, { headers });
   if (!res.ok) throw new Error(`Status check failed (${res.status})`);
   return (await res.json()) as JobState;
+}
+
+export async function cancelJob(jobId: string): Promise<void> {
+  if (USE_MOCK) return;
+  const path = `/jobs/${jobId}/cancel`;
+  const headers = await signedHeaders("POST", path, new Uint8Array());
+  const res = await fetch(API_BASE + path, { method: "POST", headers });
+  if (!res.ok) throw new Error(`Cancel job failed (${res.status})`);
 }
 
 /**

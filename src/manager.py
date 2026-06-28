@@ -73,7 +73,7 @@ class ProviderManager:
                 ) from e
         return self._module_cache[site]
 
-    def run(self, provider_name: str, prompt: str) -> str:
+    def run(self, provider_name: str, prompt: str, **options) -> str:
         conf = self.resolve(provider_name)
         module = self._load(conf["site"])
         if not hasattr(module, "run"):
@@ -82,7 +82,7 @@ class ProviderManager:
                 f"(contract 1 violated)"
             )
         # Contract: run(profile, prompt, **options) -> str
-        return module.run(conf["profile"], prompt, timeout_ms=conf["timeout_ms"])
+        return module.run(conf["profile"], prompt, timeout_ms=conf["timeout_ms"], **options)
 
 
 __all__ = ["ProviderManager", "DEFAULTS"]

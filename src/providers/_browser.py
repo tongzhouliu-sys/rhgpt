@@ -142,7 +142,14 @@ def shutdown() -> None:
 
 
 # ----- the shared web Provider engine ----------------------------------------
-def run_web(site: dict, profile: str, prompt: str, timeout_ms: int = 120000) -> str:
+def run_web(
+    site: dict,
+    profile: str,
+    prompt: str,
+    timeout_ms: int = 120000,
+    on_chunk: Optional[Callable[[str], None]] = None,
+    **options,
+) -> str:
     """Drive one web model end-to-end and return its answer text.
 
     `site` describes the site (see any Provider module for the shape):
@@ -165,6 +172,14 @@ def run_web(site: dict, profile: str, prompt: str, timeout_ms: int = 120000) -> 
                 body = resp.text()
                 text = parse(body)
                 if text and text.strip():
+                    prev_text = captured["text"]
+                    if on_chunk:
+                        if prev_text is None:
+                            on_chunk(text)
+                        elif text.startswith(prev_text):
+                            delta = text[len(prev_text):]
+                            if delta:
+                                on_chunk(delta)
                     captured["text"] = text
         except Exception:
             # A single un-parseable frame must never crash the run; DOM fallback

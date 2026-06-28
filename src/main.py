@@ -221,6 +221,10 @@ def create_app(
         job = jobs[job_id]
         emit = make_emit(job)
         os.makedirs(job["session_dir"], exist_ok=True)
+        
+        def is_cancelled() -> bool:
+            return job.get("cancelled", False)
+
         try:
             if pass_runtime_kwargs:
                 run_pipeline_fn(
@@ -231,10 +235,14 @@ def create_app(
                     builder=PromptBuilder(prompts_dir),
                     manager=ProviderManager(providers_path),
                     job_id=job_id,
+                    is_cancelled=is_cancelled,
                 )
             else:
                 run_pipeline_fn(pipeline, user_question, job["session_dir"], emit)
-            job["status"] = "succeeded"
+            if is_cancelled():
+                job["status"] = "failed"
+            else:
+                job["status"] = "succeeded"
         except Exception as e:  # noqa: BLE001  ([修正-1] worker thread, sync-safe)
             # Worker-level uncaught failure -> fatal event (seq assigned by emit)
             # with the schema's {type,message} error object.
@@ -282,6 +290,7 @@ def create_app(
             job_id = str(uuid.uuid4())
             jobs[job_id] = {
                 "status": "running",
+                "cancelled": False,
                 "events": [],
                 "session_dir": os.path.join(sessions_root, job_id),
             }
@@ -304,6 +313,24 @@ def create_app(
         if not job:
             raise HTTPException(status_code=404, detail="job not found")
         return {"job_id": job_id, "status": job["status"], "events": list(job["events"])}
+
+    @app.post("/jobs/{job_id}/cancel")
+    async def cancel_job(
+        job_id: str,
+        request: Request,
+        x_api_key: str = Header(None),
+        x_timestamp: str = Header(None),
+        x_signature: str = Header(None),
+    ):
+        await authenticate(request, x_api_key, x_timestamp, x_signature)
+        job = jobs.get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="job not found")
+        if job["status"] == "running":
+            job["cancelled"] = True
+            job["status"] = "failed"
+            make_emit(job)({"type": "fatal", "error": {"type": "cancelled", "message": "job cancelled by user"}})
+        return {"job_id": job_id, "status": job["status"]}
 
     @app.get("/jobs/{job_id}/events")
     async def stream_events(

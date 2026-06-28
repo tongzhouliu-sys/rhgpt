@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  cancelJob,
   createJob,
   downloadExport,
   streamEvents,
@@ -12,6 +13,7 @@ import {
 import { renderMarkdown } from "../lib/markdown";
 import ModelProbe from "./components/ModelProbe";
 import AvatarScene from "./components/AvatarScene";
+import AgentLogo from "./components/AgentLogo";
 
 type Phase = "idle" | "running" | "done" | "error";
 type NodeStatus = "running" | "succeeded" | "failed";
@@ -25,9 +27,9 @@ interface NodeState {
 }
 
 const PIPELINES = [
-  { value: "pipelines/round1.yaml", label: "round1 · 首轮" },
-  { value: "pipelines/api_smoke.yaml", label: "api_smoke · API路线" },
-  { value: "pipelines/continue.yaml", label: "continue · 再来一轮" },
+  { value: "pipelines/round1.yaml", label: "round1 · 首轮架构分析" },
+  { value: "pipelines/api_smoke.yaml", label: "api_smoke · 官方API连通路线" },
+  { value: "pipelines/continue.yaml", label: "continue · 深入再来一轮" },
 ];
 
 const BADGE: Record<NodeStatus, string> = {
@@ -37,6 +39,7 @@ const BADGE: Record<NodeStatus, string> = {
 };
 
 export default function Page() {
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [question, setQuestion] = useState("");
   const [pipeline, setPipeline] = useState(PIPELINES[0].value);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -45,6 +48,24 @@ export default function Page() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Sync theme with html data attribute & localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("rh_theme") as "dark" | "light" | null;
+    if (saved) {
+      setTheme(saved);
+      document.documentElement.setAttribute("data-theme", saved);
+    } else {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    localStorage.setItem("rh_theme", next);
+    document.documentElement.setAttribute("data-theme", next);
+  };
 
   const applyEvent = useCallback((ev: RhEvent) => {
     if (ev.type === "pipeline_finished") {
@@ -64,9 +85,12 @@ export default function Page() {
       const cur = next[key] ?? { key, status: "running" as NodeStatus };
       if (ev.provider) cur.provider = ev.provider;
       if (ev.type === "step_started") cur.status = "running";
-      else if (ev.type === "step_succeeded") {
+      else if (ev.type === "step_chunk") {
+        cur.status = "running";
+        cur.content = (cur.content || "") + (ev.delta || "");
+      } else if (ev.type === "step_succeeded") {
         cur.status = "succeeded";
-        cur.content = ev.content ?? "";
+        cur.content = ev.content ?? cur.content ?? "";
       } else if (ev.type === "step_failed") {
         cur.status = "failed";
         cur.error = ev.error;
@@ -123,19 +147,31 @@ export default function Page() {
     [jobId]
   );
 
+  const onCancel = useCallback(async () => {
+    if (!jobId) return;
+    try {
+      await cancelJob(jobId);
+      abortRef.current?.abort();
+      setBanner("任务已被主动终止");
+      setPhase("error");
+    } catch (err) {
+      setBanner(err instanceof Error ? err.message : "终止任务失败");
+    }
+  }, [jobId]);
+
   const running = phase === "running";
   const finished = phase === "done";
   const statusDot = running ? "run" : phase === "done" ? "ok" : phase === "error" ? "err" : "";
   const statusText =
     phase === "idle"
-      ? "待命"
+      ? "系统待命就绪"
       : running
       ? jobId
-        ? `运行中 · job ${jobId.slice(0, 8)}`
-        : "提交中…"
+        ? `智能接力协作中 · 任务 ID ${jobId.slice(0, 8)}`
+        : "提交请求中…"
       : phase === "done"
-      ? "已完成"
-      : "已中断";
+      ? "所有协作流程已完成"
+      : "运行中断或出错";
 
   // 获取当前正在运行节点的 Provider 和 Step 名字
   const currentRunningKey = order.find((k) => nodes[k]?.status === "running");
@@ -143,16 +179,28 @@ export default function Page() {
 
   return (
     <main className="wrap">
+      {/* 顶部 Navigation / Masthead */}
       <header className="masthead">
-        <span className="brand">RHCLOUD V1</span>
-        <h1>AI 智能接力协作控制台</h1>
-        <span className="sub">multi-model relay {USE_MOCK ? "· MOCK" : ""}</span>
+        <div className="brand-group">
+          <div className="brand-row">
+            <span className="brand">RHCLOUD V1</span>
+            <h1>AI 智能接力协作控制台</h1>
+          </div>
+          <span className="sub">multi-model relay console {USE_MOCK ? "· MOCK 模式" : ""}</span>
+        </div>
+
+        <div className="masthead-actions">
+          {/* 大模型可用性探针（右侧图标展示） */}
+          <ModelProbe />
+
+          {/* 深色 / 浅色皮肤切换按钮 */}
+          <button className="theme-toggle" onClick={toggleTheme} title="切换外观主题">
+            {theme === "dark" ? "☀️ 浅色" : "🌙 深色"}
+          </button>
+        </div>
       </header>
 
-      {/* 1. 大模型探针仪表盘 */}
-      <ModelProbe />
-
-      {/* 2. 交互控制面板 */}
+      {/* 交互控制面板 */}
       <section className="panel">
         <label className="field" htmlFor="q">
           输入您的任务或提问 (Prompt)
@@ -179,17 +227,22 @@ export default function Page() {
             </select>
           </div>
           <button onClick={run} disabled={running || !question.trim()}>
-            {running ? "智能协同中…" : "🚀 开始接力执行"}
+            {running ? "🚀 智能协同中…" : "🚀 开始接力执行"}
           </button>
+          {running && (
+            <button className="ghost" onClick={onCancel} style={{ color: "var(--danger)", borderColor: "var(--danger)" }}>
+              🛑 终止任务
+            </button>
+          )}
         </div>
       </section>
 
-      {/* 3. 动态小人沟通互动场景 (仅在运行中或有节点执行时展示) */}
+      {/* 动态小人沟通互动办公室场景 (运行中或已有执行步骤时展示) */}
       {(running || phase !== "idle") && (
-        <AvatarScene activeProvider={currentProvider} stepKey={currentRunningKey} />
+        <AvatarScene activeProvider={currentProvider} stepKey={currentRunningKey} question={question} />
       )}
 
-      {/* 4. 任务执行时间轴与节点卡片 */}
+      {/* 任务执行时间轴与节点卡片 */}
       {phase !== "idle" && (
         <>
           <div className="statusline">
@@ -206,12 +259,17 @@ export default function Page() {
                   <div className={`card ${n.status} ${open ? "open" : ""}`}>
                     <div className="head">
                       <span className="key">{key}</span>
-                      {n.provider && <span className="provider">{n.provider}</span>}
+                      {n.provider && (
+                        <div className="provider-tag">
+                          <AgentLogo provider={n.provider} size={16} />
+                          <span>{n.provider}</span>
+                        </div>
+                      )}
                       <span className="badge">{BADGE[n.status]}</span>
                     </div>
-                    {n.status === "succeeded" && n.content !== undefined && (
+                    {(n.status === "succeeded" || (n.status === "running" && n.content)) && (
                       <div className="body">
-                        <div className="md" dangerouslySetInnerHTML={{ __html: renderMarkdown(n.content) }} />
+                        <div className="md" dangerouslySetInnerHTML={{ __html: renderMarkdown(n.content || "") }} />
                       </div>
                     )}
                     {n.status === "failed" && (
@@ -229,7 +287,7 @@ export default function Page() {
 
       {banner && <div className="banner" style={{ marginTop: "20px", color: "var(--danger)" }}>{banner}</div>}
 
-      {/* 5. 导出结果面板 */}
+      {/* 导出结果面板 */}
       {finished && jobId && (
         <section className="panel" style={{ marginTop: "28px" }}>
           <h3 style={{ margin: "0 0 16px 0", color: "var(--accent)" }}>📥 任务导出与续写</h3>
