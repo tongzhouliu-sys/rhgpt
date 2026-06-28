@@ -6,6 +6,13 @@ export const metadata: Metadata = {
   description: "多模型接力对话流水线 — 实时执行与导出",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN">

@@ -625,3 +625,104 @@ button.ghost:hover {
 .typing-dot:nth-child(2) { animation-delay: 0.2s; }
 .typing-dot:nth-child(3) { animation-delay: 0.4s; }
 @keyframes typingDot { 0%,100%{ transform: translateY(0); opacity: 0.3; } 50%{ transform: translateY(-5px); opacity: 1; } }
+
+/* ── Mobile & Responsive Adaptation (手机端深度适配) ── */
+@media (max-width: 768px) {
+  .wrap {
+    padding: 20px 14px 80px;
+  }
+
+  .masthead {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .masthead-actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .panel {
+    padding: 18px 16px;
+    border-radius: 16px;
+  }
+
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .controls button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .model-select-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .model-select-header > div {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .model-select-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+  }
+
+  .model-pill {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .relay {
+    padding-left: 24px;
+  }
+
+  .relay::before {
+    left: 9px;
+  }
+
+  .node::before {
+    left: -24px;
+    width: 14px;
+    height: 14px;
+  }
+
+  .card .head {
+    padding: 12px 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .card .body {
+    padding: 16px 14px;
+  }
+
+  .office-room {
+    padding: 14px;
+    min-height: 180px;
+  }
+
+  .office-bubble {
+    max-width: 180px;
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .brand-row h1 {
+    font-size: 20px;
+  }
+
+  .model-select-grid {
+    grid-template-columns: 1fr;
+  }
+}
