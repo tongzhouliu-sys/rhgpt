@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import AgentLogo from "./AgentLogo";
 import { fetchProviders, type ProviderInfo } from "../../lib/api";
 
-export default function ModelProbe() {
+export default function ModelProbe({ alwaysOpen = false }: { alwaysOpen?: boolean }) {
   const [open, setOpen] = useState(false);
   const [models, setModels] = useState<ProviderInfo[]>([]);
 
@@ -13,30 +13,33 @@ export default function ModelProbe() {
   }, []);
 
   const total = models.length;
+  const isPopoverOpen = alwaysOpen || open;
 
   return (
-    <div className="probe-compact-container" onMouseLeave={() => setOpen(false)}>
-      <div
-        className="probe-compact-bar"
-        onClick={() => setOpen((prev) => !prev)}
-        onMouseEnter={() => setOpen(true)}
-        title="点击查看所有大模型连通状态"
-      >
-        <div className="probe-mini-icons">
-          {models.slice(0, 5).map((m) => (
-            <div key={m.id} className="probe-mini-item">
-              <AgentLogo provider={m.site} size={18} />
-              <span className="probe-dot-overlay" />
-            </div>
-          ))}
+    <div className={`probe-compact-container ${alwaysOpen ? "always-open" : ""}`} onMouseLeave={() => !alwaysOpen && setOpen(false)}>
+      {!alwaysOpen && (
+        <div
+          className="probe-compact-bar"
+          onClick={() => setOpen((prev) => !prev)}
+          onMouseEnter={() => setOpen(true)}
+          title="点击查看所有大模型连通状态"
+        >
+          <div className="probe-mini-icons">
+            {models.slice(0, 5).map((m) => (
+              <div key={m.id} className="probe-mini-item">
+                <AgentLogo provider={m.site} size={18} />
+                <span className="probe-dot-overlay" />
+              </div>
+            ))}
+          </div>
+          <span style={{ fontSize: "12px", fontFamily: "var(--mono)", fontWeight: 600, color: "var(--accent)" }}>
+            📡 {total} 模型就绪
+          </span>
         </div>
-        <span style={{ fontSize: "12px", fontFamily: "var(--mono)", fontWeight: 600, color: "var(--accent)" }}>
-          📡 {total} 模型就绪
-        </span>
-      </div>
+      )}
 
-      {open && (
-        <div className="probe-popover">
+      {isPopoverOpen && (
+        <div className={`probe-popover ${alwaysOpen ? "inline-mode" : ""}`}>
           <div className="probe-popover-header">
             <span>📡 大模型可用性探针</span>
             <span style={{ color: "var(--success)" }}>{total}/{total} 在线</span>

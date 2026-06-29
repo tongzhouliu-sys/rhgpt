@@ -189,7 +189,7 @@ class AccountPoolManager:
                 wait_seconds = min(1.0, deadline - now)
                 self._lock.wait(timeout=wait_seconds)
 
-    def get_status_summary() -> List[dict]:
+    def get_status_summary(self) -> List[dict]:
         with self._lock:
             return [s.to_dict() for s in self._slots.values()]
 
