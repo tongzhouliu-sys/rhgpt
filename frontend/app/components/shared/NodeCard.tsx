@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { renderMarkdown } from "../../../lib/markdown";
 import AgentLogo from "../AgentLogo";
 
@@ -44,6 +44,7 @@ interface NodeCardProps {
 export const NodeCard: React.FC<NodeCardProps> = React.memo(
   ({ nodeKey, node, open, onToggleExpand }) => {
     const n = node;
+    const [copiedLane, setCopiedLane] = useState<string | null>(null);
     const hasRunnerups = n.runnerups && Object.keys(n.runnerups).length > 0;
     const isQueued = n.status === "running" && n.queuedPosition !== undefined;
     const isWinnerTyping =
@@ -56,6 +57,13 @@ export const NodeCard: React.FC<NodeCardProps> = React.memo(
       n.status === "running" &&
       n.content &&
       (n.content.startsWith("🔄") || n.content.startsWith("⏳"));
+
+    const handleCopy = (content: string, laneId: string) => {
+      navigator.clipboard.writeText(content).then(() => {
+        setCopiedLane(laneId);
+        setTimeout(() => setCopiedLane(null), 1500);
+      });
+    };
 
     return (
       <div className={`node ${n.status}`}>
@@ -98,7 +106,6 @@ export const NodeCard: React.FC<NodeCardProps> = React.memo(
             </span>
           </div>
 
-          {/* Step transition animation / queuing animation */}
           {open && isTransitioning && (
             <div className="body">
               <div className="step-transition-card">
@@ -108,10 +115,8 @@ export const NodeCard: React.FC<NodeCardProps> = React.memo(
             </div>
           )}
 
-          {/* Main body: parallel race lanes */}
           {open && !isTransitioning && (n.status === "succeeded" || (n.status === "running" && n.content)) && (
             <div className="body">
-              {/* Winner (primary) lane */}
               <div className={`race-lane-card is-winner ${isWinnerTyping ? "is-typing" : ""}`}>
                 <div className="race-lane-header">
                   {n.provider && <AgentLogo provider={n.provider} size={14} />}
@@ -129,6 +134,18 @@ export const NodeCard: React.FC<NodeCardProps> = React.memo(
                       <span />
                     </div>
                   )}
+                  {(n.status === "succeeded" || n.content) && (
+                    <button
+                      className="copy-btn"
+                      style={{ marginLeft: "auto", background: "transparent", border: "none", color: "var(--accent)", cursor: "pointer", fontSize: "12px", padding: "2px 6px", borderRadius: "4px" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCopy(n.content || "", "winner");
+                      }}
+                    >
+                      {copiedLane === "winner" ? "✅ 已复制" : "📋 复制"}
+                    </button>
+                  )}
                 </div>
                 <div className="race-lane-body">
                   <div className="md" dangerouslySetInnerHTML={{ __html: renderMarkdown(n.content || "") }} />
@@ -136,11 +153,11 @@ export const NodeCard: React.FC<NodeCardProps> = React.memo(
                 </div>
               </div>
 
-              {/* Runnerup race lanes — all visible, streaming live */}
               {hasRunnerups && (
                 <div className={`race-lanes ${Object.keys(n.runnerups!).length > 1 ? "has-multiple" : ""}`}>
                   {Object.entries(n.runnerups!).map(([rProvider, rContent]) => {
                     const isRTyping = n.runnerupTyping?.[rProvider] !== false && n.status === "running";
+                    const laneId = `runnerup-${rProvider}`;
                     return (
                       <div key={rProvider} className={`race-lane-card ${isRTyping ? "is-typing" : ""}`}>
                         <div className="race-lane-header">
@@ -157,6 +174,18 @@ export const NodeCard: React.FC<NodeCardProps> = React.memo(
                               <span />
                               <span />
                             </div>
+                          )}
+                          {(!isRTyping || rContent) && (
+                            <button
+                              className="copy-btn"
+                              style={{ marginLeft: "auto", background: "transparent", border: "none", color: "var(--accent)", cursor: "pointer", fontSize: "12px", padding: "2px 6px", borderRadius: "4px" }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopy(rContent, laneId);
+                              }}
+                            >
+                              {copiedLane === laneId ? "✅ 已复制" : "📋 复制"}
+                            </button>
                           )}
                         </div>
                         <div className="race-lane-body">

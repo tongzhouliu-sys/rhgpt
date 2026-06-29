@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { PIPELINES, useAppJob, useAppSettings } from "../../context/AppContext";
 import { ModelPillGrid } from "../../components/shared/ModelPillGrid";
 import ModelProbe from "../../components/ModelProbe";
@@ -11,8 +11,37 @@ export const SettingsTab: React.FC = React.memo(() => {
   const { phase } = useAppJob();
   const running = phase === "running";
 
+  /* ── 首次弹窗 ── */
+  const [showWelcome, setShowWelcome] = useState(false);
+  useEffect(() => {
+    const welcomed = localStorage.getItem("rh_welcomed");
+    if (!welcomed) {
+      setShowWelcome(true);
+    }
+  }, []);
+  const dismissWelcome = () => {
+    setShowWelcome(false);
+    localStorage.setItem("rh_welcomed", "1");
+  };
+
   return (
     <div className="mobile-tab-content">
+      {/* 公益项目首次弹窗 */}
+      {showWelcome && (
+        <div className="welcome-modal-overlay" onClick={dismissWelcome}>
+          <div className="welcome-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="welcome-modal-icon">🌟</div>
+            <h2 className="welcome-modal-title">公益项目声明</h2>
+            <p className="welcome-modal-body">本项目为公益项目。</p>
+            <p className="welcome-modal-thanks">感谢 <strong>WUWEI</strong> 提供大模型支持！</p>
+            <p className="welcome-modal-thanks">感谢 <strong>KAISHANG</strong> 为开发过程提供指导！</p>
+            <button className="welcome-modal-btn" onClick={dismissWelcome}>
+              知道了
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="mobile-chat-header">
         <span className="brand" style={{ fontSize: "16px" }}>RHCLOUD V1</span>
         <span style={{ fontSize: "12px", color: "var(--muted)" }}>系统与模型配置</span>
@@ -33,22 +62,22 @@ export const SettingsTab: React.FC = React.memo(() => {
 
       {/* 流水线配置 */}
       <div className="mobile-card" style={{ marginTop: "14px" }}>
-        <label className="field" htmlFor="mobile-pl" style={{ margin: "0 0 8px 0" }}>
+        <label className="field" style={{ margin: "0 0 8px 0" }}>
           选择默认执行流水线
         </label>
-        <select
-          id="mobile-pl"
-          value={pipeline}
-          onChange={(e) => setPipeline(e.target.value)}
-          disabled={running}
-          style={{ width: "100%", height: "42px" }}
-        >
+        <div className="pipeline-pills">
           {PIPELINES.map((p) => (
-            <option key={p.value} value={p.value}>
-              {p.label}
-            </option>
+            <button
+              key={p.value}
+              type="button"
+              className={`pipeline-pill ${pipeline === p.value ? "active" : ""}`}
+              onClick={() => setPipeline(p.value)}
+              disabled={running}
+            >
+              {p.shortLabel}
+            </button>
           ))}
-        </select>
+        </div>
       </div>
 
       {/* 模型选择网格 */}

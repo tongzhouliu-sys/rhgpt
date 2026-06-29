@@ -24,10 +24,12 @@ Hardening over the §6.6 reference skeleton (mirroring how A hardened its kernel
 
 from __future__ import annotations
 
+import errno
 import inspect
 import json
 import logging
 import os
+import shutil
 import threading
 import time
 import uuid
@@ -91,6 +93,35 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _free_mb(path: str) -> Optional[float]:
+    """Free megabytes on the filesystem holding `path` (nearest existing parent).
+
+    Returns None if it cannot be determined (never blocks a request on that).
+    """
+    p = path
+    for _ in range(40):
+        if os.path.isdir(p):
+            break
+        parent = os.path.dirname(p)
+        if not parent or parent == p:
+            break
+        p = parent
+    try:
+        return shutil.disk_usage(p or ".").free / (1024 * 1024)
+    except OSError:
+        return None
+
+
+def _is_enospc(exc: BaseException) -> bool:
+    """True if the exception chain contains a 'No space left on device' error."""
+    seen = exc
+    while seen is not None:
+        if isinstance(seen, OSError) and seen.errno == errno.ENOSPC:
+            return True
+        seen = seen.__cause__ or seen.__context__
+    return False
+
+
 def _accepts_runtime_kwargs(fn: Callable) -> bool:
     """True if `fn` takes A's optional builder/manager/job_id kwargs (or **kw).
 
@@ -147,6 +178,15 @@ def create_app(
     rate_limit_per_min = rate_limit_per_min or _env_int("RATE_LIMIT_PER_MIN", 30)
     job_timeout = job_timeout or _env_int("JOB_TIMEOUT_SECONDS", 900)
     alert_threshold = alert_threshold or threshold_from_env()
+    # Refuse new jobs (507) before we run out of disk, so the failure is an
+    # explicit, CORS-friendly error instead of a bare 500 from os.makedirs.
+    min_free_disk_mb = _env_int("MIN_FREE_DISK_MB", 50)
+
+    free = _free_mb(sessions_root)
+    if free is not None and free < min_free_disk_mb:
+        _log.warning(
+            "disk_low_at_startup: %.1f MB free (< %d MB min)", free, min_free_disk_mb
+        )
 
     app = FastAPI(title="RHCLOUD V1")
     app.add_middleware(
@@ -161,6 +201,36 @@ def create_app(
             "Last-Event-ID",
         ],
     )
+
+    def _cors_headers(request: Request) -> dict[str, str]:
+        """ACAO headers to mirror CORSMiddleware on responses it can't reach."""
+        origin = request.headers.get("origin")
+        if origin and origin == frontend_origin:
+            return {"Access-Control-Allow-Origin": origin, "Vary": "Origin"}
+        return {}
+
+    @app.exception_handler(Exception)
+    async def _unhandled_exception_handler(request: Request, exc: Exception):
+        """Convert unhandled errors into CORS-tagged JSON.
+
+        An uncaught exception is otherwise emitted by Starlette's outermost
+        ServerErrorMiddleware — *above* CORSMiddleware — so the 500 carries no
+        Access-Control-Allow-Origin and the browser reports the misleading
+        "Failed to fetch" instead of the real error. Adding the header here keeps
+        the real status/message visible to the client (and maps a full disk to a
+        precise 507). [Failed-to-fetch root-cause fix]
+        """
+        if _is_enospc(exc):
+            status, detail = 507, "insufficient storage: server disk is full, retry later"
+            _log.error("request_failed_enospc on %s", request.url.path)
+        else:
+            status, detail = 500, "internal server error"
+            _log.exception(
+                "request_unhandled_exception on %s (%s)",
+                request.url.path,
+                type(exc).__name__,
+            )
+        return JSONResponse(status_code=status, content={"detail": detail}, headers=_cors_headers(request))
 
     executor = ThreadPoolExecutor(max_workers=max(1, max_concurrent))
     rate_limiter = RateLimiter(rate_limit_per_min, 60.0, clock)
@@ -315,7 +385,29 @@ def create_app(
         selected = body.get("selected_providers")
         job_id = str(uuid.uuid4())
         session_dir = os.path.join(sessions_root, job_id)
-        os.makedirs(session_dir, exist_ok=True)
+
+        # Disk guard: a full Volume makes os.makedirs raise OSError(ENOSPC),
+        # which without this would surface as a CORS-less 500 → "Failed to fetch"
+        # in the browser. Fail fast and explicitly with 507 instead.
+        free = _free_mb(sessions_root)
+        if free is not None and free < min_free_disk_mb:
+            _log.error(
+                "job_rejected_low_disk: %.1f MB free (< %d MB min)", free, min_free_disk_mb
+            )
+            raise HTTPException(
+                status_code=507,
+                detail="insufficient storage: server disk is full, retry later",
+            )
+        try:
+            os.makedirs(session_dir, exist_ok=True)
+        except OSError as e:
+            if _is_enospc(e):
+                log_event(_log, "session_makedirs_enospc", level=logging.ERROR)
+                raise HTTPException(
+                    status_code=507,
+                    detail="insufficient storage: server disk is full, retry later",
+                )
+            raise
 
         if isinstance(selected, list) and len(selected) > 0:
             import yaml

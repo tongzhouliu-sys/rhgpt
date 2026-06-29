@@ -785,19 +785,33 @@ button.ghost:hover {
 }
 @keyframes blink { from { opacity: 0.2; } to { opacity: 1; } }
 
-/* Animated Messenger Character */
-.messenger-runner {
-  position: absolute;
-  top: 50px;
-  left: 60px;
-  z-index: 20;
+/* Conference Table (center element) */
+.meeting-table {
   display: flex;
   flex-direction: column;
   align-items: center;
-  transition: all 1.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  justify-content: center;
+  z-index: 10;
+  flex: 0 0 auto;
 }
-.messenger-runner.idle { left: 60px; }
-.messenger-runner.running { left: calc(100% - 150px); }
+.meeting-table-surface {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
+  border: 1.5px solid rgba(255,255,255,0.1);
+  border-radius: 18px;
+  padding: 18px 28px;
+  min-width: 100px;
+  backdrop-filter: blur(6px);
+  transition: border-color 0.4s ease;
+}
+.meeting-mic {
+  font-size: 36px;
+  display: block;
+  transition: opacity 0.4s ease, transform 0.5s ease, filter 0.5s ease;
+}
 
 /* Speech Bubbles */
 .office-bubble {
@@ -845,13 +859,7 @@ button.ghost:hover {
   font-size: 40px;
   filter: drop-shadow(0 6px 12px rgba(0,0,0,0.25));
 }
-.avatar-character.bounce {
-  animation: characterBounce 0.6s infinite alternate ease-in-out;
-}
-@keyframes characterBounce {
-  from { transform: translateY(0); }
-  to { transform: translateY(-8px); }
-}
+/* bounce removed — using scale/glow transitions in JSX instead */
 
 .typing-indicator {
   display: flex;
@@ -1154,8 +1162,12 @@ button.ghost:hover {
     min-height: 180px;
   }
 
-  .messenger-runner.running {
-    left: calc(100% - 110px);
+  .meeting-table-surface {
+    padding: 12px 16px;
+    min-width: 70px;
+  }
+  .meeting-mic {
+    font-size: 28px;
   }
 
   .office-bubble {
@@ -1664,6 +1676,322 @@ button.ghost:hover {
 .workflow-cta-btn:active {
   transform: scale(0.98);
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
+}
+
+/* Appended custom styles for RHGPT console improvements */
+
+/* ── Pipeline Selector (Pill Style) ── */
+.pipeline-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.pipeline-pill {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: normal;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  background: var(--ghost-btn-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: none;
+  cursor: pointer;
+}
+
+.pipeline-pill:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(56, 189, 248, 0.08);
+  box-shadow: 0 2px 8px var(--accent-glow);
+  filter: none;
+}
+
+.pipeline-pill.active:not(:disabled) {
+  background: linear-gradient(135deg, var(--accent), #818cf8);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 4px 12px var(--accent-glow);
+  transform: none;
+}
+
+.pipeline-pill.active:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px var(--accent-glow);
+  filter: brightness(1.1);
+}
+
+.pipeline-pill:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ── Welcome Modal ── */
+.welcome-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: welcomeFadeIn 0.3s ease-out;
+}
+
+.welcome-modal {
+  background: var(--panel-solid);
+  border: 1px solid var(--border-bright);
+  border-radius: 20px;
+  width: 90%;
+  max-width: 440px;
+  padding: 32px 24px;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 20px var(--accent-glow);
+  backdrop-filter: blur(16px);
+  animation: welcomeScaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Glow bar at the top of modal */
+.welcome-modal::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent), #818cf8, var(--accent));
+}
+
+.welcome-modal-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  animation: welcomeFloatIcon 3s ease-in-out infinite;
+  display: inline-block;
+}
+
+.welcome-modal-title {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0 0 16px 0;
+  background: linear-gradient(135deg, var(--text), var(--muted));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.welcome-modal-body {
+  font-size: 15px;
+  color: var(--text);
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+
+.welcome-modal-thanks {
+  font-size: 13.5px;
+  color: var(--muted);
+  margin: 6px 0;
+  line-height: 1.4;
+}
+
+.welcome-modal-thanks strong {
+  color: var(--accent);
+}
+
+.welcome-modal-btn {
+  margin-top: 24px;
+  width: 100%;
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 700;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent), #818cf8);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 4px 14px var(--accent-glow);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.welcome-modal-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--accent-glow);
+  filter: brightness(1.1);
+}
+
+.welcome-modal-btn:active {
+  transform: translateY(0);
+}
+
+/* ── Copy Button Hover & Styling Overrides ── */
+.copy-btn {
+  font-family: var(--mono);
+  font-size: 11px !important;
+  font-weight: 600;
+  letter-spacing: normal;
+  padding: 3px 8px !important;
+  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.08) !important;
+  color: var(--accent) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  transition: all 0.2s ease !important;
+  transform: none !important;
+}
+
+.copy-btn:hover {
+  background: rgba(56, 189, 248, 0.18) !important;
+  border-color: var(--accent) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 6px var(--accent-glow) !important;
+  filter: none !important;
+}
+
+.copy-btn:active {
+  transform: translateY(0) !important;
+}
+
+/* ── Enable User Select for Text Copying ── */
+textarea,
+.md,
+.race-lane-body,
+.mobile-card textarea,
+.panel textarea {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+/* ── Desktop History List ── */
+.desktop-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.desktop-history-item {
+  display: flex;
+  align-items: center;
+  background: var(--box-subtle-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.desktop-history-item:hover {
+  border-color: var(--border-bright);
+  background: var(--panel-hover);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.desktop-history-content {
+  flex: 1;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.desktop-history-q {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80%;
+}
+
+.desktop-history-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.desktop-history-delete {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  font-size: 16px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  opacity: 0;
+  color: var(--danger);
+  transform: translateX(10px);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.desktop-history-item:hover .desktop-history-delete {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.desktop-history-delete:hover {
+  background: rgba(248, 113, 113, 0.1);
+  color: #ef4444;
+  transform: scale(1.1) !important;
+  box-shadow: none !important;
+}
+
+/* ── Animations ── */
+@keyframes welcomeFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes welcomeScaleIn {
+  from { transform: scale(0.9) translateY(10px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+@keyframes welcomeFloatIcon {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* ── Responsive Additions for Pills and Modal ── */
+@media (max-width: 768px) {
+  .welcome-modal {
+    padding: 24px 16px;
+    width: 92%;
+  }
+  .welcome-modal-title {
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+  .welcome-modal-body {
+    font-size: 13.5px;
+    margin-bottom: 12px;
+  }
+  .welcome-modal-thanks {
+    font-size: 12.5px;
+  }
+  .welcome-modal-btn {
+    margin-top: 18px;
+    padding: 10px 20px;
+    font-size: 14px;
+  }
 }
 
 

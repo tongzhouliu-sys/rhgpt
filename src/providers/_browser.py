@@ -43,6 +43,27 @@ DEFAULT_UA = (
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
 
+
+def _disk_cache_bytes() -> int:
+    """Hard cap (bytes) on Chromium's on-disk HTTP cache per profile.
+
+    The persistent profiles' caches are what fill the small Railway Volume over
+    time; capping them keeps growth bounded at the source. Default 50 MiB; set
+    CHROMIUM_DISK_CACHE_BYTES=0 to let Chromium manage it.
+    """
+    try:
+        return int(os.environ.get("CHROMIUM_DISK_CACHE_BYTES", str(50 * 1024 * 1024)))
+    except ValueError:
+        return 50 * 1024 * 1024
+
+
+def _launch_args() -> list[str]:
+    args = ["--disable-blink-features=AutomationControlled", "--no-sandbox"]
+    cap = _disk_cache_bytes()
+    if cap > 0:
+        args.append(f"--disk-cache-size={cap}")
+    return args
+
 # Minimal stealth: mask the most common automation tells. Used when
 # playwright_stealth is unavailable. Not a substitute for a real fingerprint
 # review, but removes the obvious `navigator.webdriver` / empty-plugins signals.
@@ -115,13 +136,13 @@ def get_context(profile: str):
                 locale="zh-CN",
                 timezone_id="Asia/Shanghai",
                 viewport={"width": 1280, "height": 800},
-                args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+                args=_launch_args(),
             )
         except Exception:
             # Fallback if profile directory is locked by another process/thread
             browser = pw.chromium.launch(
                 headless=_headless(),
-                args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+                args=_launch_args(),
             )
             ctx = browser.new_context(
                 user_agent=DEFAULT_UA,

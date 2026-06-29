@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { USE_MOCK } from "../../lib/api";
 import { PIPELINES, useAppJob, useAppSettings } from "../context/AppContext";
 import ModelProbe from "../components/ModelProbe";
@@ -38,6 +38,10 @@ export const DesktopLayout: React.FC = React.memo(() => {
     againRound,
     onExport,
     toggleExpand,
+    chatHistory,
+    loadHistoryItem,
+    deleteHistoryItem,
+    retryHistoryItem,
   } = useAppJob();
 
   const running = phase === "running";
@@ -46,8 +50,37 @@ export const DesktopLayout: React.FC = React.memo(() => {
   const currentRunningKey = order.find((k) => nodes[k]?.status === "running");
   const currentProvider = currentRunningKey ? nodes[currentRunningKey]?.provider : undefined;
 
+  /* ── 首次弹窗 ── */
+  const [showWelcome, setShowWelcome] = useState(false);
+  useEffect(() => {
+    const welcomed = localStorage.getItem("rh_welcomed");
+    if (!welcomed) {
+      setShowWelcome(true);
+    }
+  }, []);
+  const dismissWelcome = () => {
+    setShowWelcome(false);
+    localStorage.setItem("rh_welcomed", "1");
+  };
+
   return (
     <main className="wrap">
+      {/* 公益项目首次弹窗 */}
+      {showWelcome && (
+        <div className="welcome-modal-overlay" onClick={dismissWelcome}>
+          <div className="welcome-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="welcome-modal-icon">🌟</div>
+            <h2 className="welcome-modal-title">公益项目声明</h2>
+            <p className="welcome-modal-body">本项目为公益项目。</p>
+            <p className="welcome-modal-thanks">感谢 <strong>WUWEI</strong> 提供大模型支持！</p>
+            <p className="welcome-modal-thanks">感谢 <strong>KAISHANG</strong> 为开发过程提供指导！</p>
+            <button className="welcome-modal-btn" onClick={dismissWelcome}>
+              知道了
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 顶部 Navigation / Masthead */}
       <header className="masthead">
         <div className="brand-group">
@@ -94,16 +127,22 @@ export const DesktopLayout: React.FC = React.memo(() => {
 
         <div className="controls">
           <div className="grow">
-            <label className="field" htmlFor="pl">
+            <label className="field">
               选择执行流水线
             </label>
-            <select id="pl" value={pipeline} onChange={(e) => setPipeline(e.target.value)} disabled={running}>
+            <div className="pipeline-pills">
               {PIPELINES.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
+                <button
+                  key={p.value}
+                  type="button"
+                  className={`pipeline-pill ${pipeline === p.value ? "active" : ""}`}
+                  onClick={() => setPipeline(p.value)}
+                  disabled={running}
+                >
+                  {p.shortLabel}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
           <button id="start-btn" onClick={run} disabled={running || !question.trim()}>
             {running ? "🚀 智能协同中…" : "🚀 开始接力执行"}
@@ -156,7 +195,7 @@ export const DesktopLayout: React.FC = React.memo(() => {
         </section>
       )}
 
-      {/* 动态小人沟通互动办公室场景 (运行中或已有执行步骤时展示) */}
+      {/* 动态会议协同场景 (运行中或已有执行步骤时展示) */}
       {(running || phase !== "idle") && (
         <AvatarScene activeProvider={currentProvider} stepKey={currentRunningKey} question={question} />
       )}
@@ -211,6 +250,48 @@ export const DesktopLayout: React.FC = React.memo(() => {
             <button onClick={againRound}>再来一轮接力</button>
           </div>
           {USE_MOCK && <p style={{ fontSize: "12px", color: "var(--muted)", marginTop: "12px" }}>Mock 模式下没有落盘文件，导出按钮已禁用。连接真实后端后可用。</p>}
+        </section>
+      )}
+
+      {/* 历史记录 */}
+      {chatHistory.length > 0 && (
+        <section className="panel" style={{ marginTop: "28px" }}>
+          <h3 style={{ margin: "0 0 16px 0", color: "var(--accent)" }}>🕒 历史记录</h3>
+          <div className="desktop-history-list">
+            {chatHistory.map((item) => (
+              <div key={item.jobId} className="desktop-history-item">
+                <div
+                  className="desktop-history-content"
+                  onClick={() => {
+                    if (item.finalStatus === "error") {
+                      retryHistoryItem(item);
+                    } else if (item.finalStatus === "done") {
+                      loadHistoryItem(item);
+                    }
+                  }}
+                  style={{ cursor: "pointer" }}
+                >
+                  <div className="desktop-history-q">{item.question}</div>
+                  <div className="desktop-history-meta">
+                    <span>{new Date(item.timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                    <span className={`status-tag ${item.finalStatus}`}>
+                      {item.finalStatus === "error" ? "🔄 点击重试" : item.finalStatus === "done" ? "👁️ 查看详情" : item.finalStatus}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  className="desktop-history-delete"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteHistoryItem(item.jobId);
+                  }}
+                  title="删除此记录"
+                >
+                  🗑️
+                </button>
+              </div>
+            ))}
+          </div>
         </section>
       )}
     </main>

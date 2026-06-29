@@ -21,13 +21,15 @@ export interface ChatHistoryItem {
   timestamp: number;
   pipeline: string;
   finalStatus: Phase;
+  savedNodes?: Record<string, NodeState>;
+  savedOrder?: string[];
 }
 
 export const PIPELINES = [
-  { value: "pipelines/race_round1.yaml", label: "race_round1 · ⚡ 多模型并发竞速接力 (推荐)" },
-  { value: "pipelines/round1.yaml", label: "round1 · 首轮架构分析" },
-  { value: "pipelines/api_smoke.yaml", label: "api_smoke · 官方API连通路线" },
-  { value: "pipelines/continue.yaml", label: "continue · 深入再来一轮" },
+  { value: "pipelines/race_round1.yaml", label: "race_round1 · ⚡ 多模型并发竞速接力 (推荐)", shortLabel: "⚡ 竞速接力（推荐）" },
+  { value: "pipelines/round1.yaml", label: "round1 · 首轮架构分析", shortLabel: "📋 标准策划" },
+  { value: "pipelines/api_smoke.yaml", label: "api_smoke · 官方API连通路线", shortLabel: "🔌 API 连通测试" },
+  { value: "pipelines/continue.yaml", label: "continue · 深入再来一轮", shortLabel: "🔄 深入再来一轮" },
 ];
 
 const FALLBACK_MODELS: ProviderInfo[] = [
@@ -74,6 +76,8 @@ interface AppJobContextType {
   toggleExpand: (key: string) => void;
   chatHistory: ChatHistoryItem[];
   loadHistoryItem: (item: ChatHistoryItem) => void;
+  deleteHistoryItem: (jobId: string) => void;
+  retryHistoryItem: (item: ChatHistoryItem) => void;
 }
 
 const AppSettingsContext = createContext<AppSettingsContextType | null>(null);
@@ -144,7 +148,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, []);
 
-  const saveHistoryItem = useCallback((id: string, q: string, pl: string, status: Phase) => {
+  const saveHistoryItem = useCallback((id: string, q: string, pl: string, status: Phase, curNodes?: Record<string, NodeState>, curOrder?: string[]) => {
     setChatHistory((prev) => {
       const filtered = prev.filter((item) => item.jobId !== id);
       const newItem: ChatHistoryItem = {
@@ -153,6 +157,8 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         timestamp: Date.now(),
         pipeline: pl,
         finalStatus: status,
+        savedNodes: curNodes,
+        savedOrder: curOrder,
       };
       const next = [newItem, ...filtered].slice(0, 50);
       localStorage.setItem("rh_chat_history", JSON.stringify(next));
@@ -305,7 +311,14 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       await streamEvents(id, applyEvent, ac.signal);
       setPhase((p) => {
         const finalP = p === "running" ? "done" : p;
-        saveHistoryItem(id, q, pipeline, finalP);
+        // Save final nodes and order to history
+        setNodes((curNodes) => {
+          setOrder((curOrder) => {
+            saveHistoryItem(id, q, pipeline, finalP, curNodes, curOrder);
+            return curOrder;
+          });
+          return curNodes;
+        });
         return finalP;
       });
     } catch (err) {
@@ -360,6 +373,29 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setPipeline(item.pipeline);
     setJobId(item.jobId);
     setPhase(item.finalStatus);
+    if (item.savedNodes) setNodes(item.savedNodes);
+    if (item.savedOrder) setOrder(item.savedOrder);
+    setExpandedKeys({});
+    setBanner(null);
+  }, []);
+
+  const deleteHistoryItem = useCallback((jobId: string) => {
+    setChatHistory((prev) => {
+      const next = prev.filter((item) => item.jobId !== jobId);
+      localStorage.setItem("rh_chat_history", JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const retryHistoryItem = useCallback((item: ChatHistoryItem) => {
+    setQuestion(item.question);
+    setPipeline(item.pipeline);
+    setPhase("idle");
+    setOrder([]);
+    setNodes({});
+    setExpandedKeys({});
+    setBanner(null);
+    setJobId(null);
   }, []);
 
   const settingsValue: AppSettingsContextType = {
@@ -392,6 +428,8 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     toggleExpand,
     chatHistory,
     loadHistoryItem,
+    deleteHistoryItem,
+    retryHistoryItem,
   };
 
   return (
