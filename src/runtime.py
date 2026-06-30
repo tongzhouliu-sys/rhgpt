@@ -126,8 +126,12 @@ def _run_step_with_retry(
         active_conf = manager.resolve(active_provider)
 
         try:
-            lock = _lock_for(active_conf["profile"])  # [修正-8] serialize per profile
-            with lock:
+            profile = active_conf.get("profile", "")
+            if profile:
+                lock = _lock_for(profile)  # [修正-8] serialize per profile
+                with lock:
+                    content = manager.run(active_provider, prompt, on_chunk=on_chunk)
+            else:
                 content = manager.run(active_provider, prompt, on_chunk=on_chunk)
             if content is None or content == "":
                 raise RuntimeError("provider returned empty content")

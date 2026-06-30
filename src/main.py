@@ -597,7 +597,7 @@ def create_app(
                 "site": conf.get("site", ""),
                 "label": conf.get("label", name),
                 "model": conf.get("model"),
-                "api": conf.get("profile", "") == "",
+                "api": conf.get("profile", "") == "" and conf.get("site") != "stub",
                 "status": slot_info.get("status", "idle"),
                 "fail_count": slot_info.get("fail_count", 0),
             })
